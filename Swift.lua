@@ -120,7 +120,7 @@ local SpeedSlider = PlayerTab:CreateSlider({
 PlayerTab:CreateButton({
     Name = "Reset Speed",
     Callback = function()
-        Slider:Set(16) -- The new slider integer value
+        SpeedSlider:Set(16) -- The new slider integer value
     end,
 })
 
