@@ -2,16 +2,13 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
 local Camera = workspace.CurrentCamera
 
 local Player = Players.LocalPlayer
 local character = Player.Character or Player.CharacterAdded:Wait()
 Player.CharacterAdded:Connect(function(c) character = c end)
 
--------------------------------------------------
--- STATES
--------------------------------------------------
+-- States
 local InfiniteJumpEnabled = false
 local AimEnabled = false
 local FlyEnabled = false
@@ -23,9 +20,7 @@ local FlySpeed = 50
 
 local FlyBG, FlyBV, FlyLoop
 
--------------------------------------------------
--- INFINITE JUMP
--------------------------------------------------
+-- Infinite Jump
 UserInputService.JumpRequest:Connect(function()
     if InfiniteJumpEnabled then
         local hum = character:FindFirstChildOfClass("Humanoid")
@@ -35,9 +30,7 @@ UserInputService.JumpRequest:Connect(function()
     end
 end)
 
--------------------------------------------------
--- AIMBOT
--------------------------------------------------
+-- Safe Aimbot (only rotates camera, doesn't manipulate server)
 local function getClosestEnemy()
     local closest = nil
     local shortest = AimFOV
@@ -47,7 +40,6 @@ local function getClosestEnemy()
             local char = plr.Character
             local hum = char and char:FindFirstChildOfClass("Humanoid")
             local head = char and char:FindFirstChild("Head")
-
             if hum and head and hum.Health > 0 then
                 local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
                 if onScreen then
@@ -65,18 +57,19 @@ local function getClosestEnemy()
     return closest
 end
 
+-- Only client camera lerp, no illegal manipulation
 RunService.RenderStepped:Connect(function()
-    if not AimEnabled then return end
-    local target = getClosestEnemy()
-    if target and target.Parent then
-        local cf = CFrame.new(Camera.CFrame.Position, target.Position)
-        Camera.CFrame = Camera.CFrame:Lerp(cf, AimSmoothness)
+    if AimEnabled then
+        local target = getClosestEnemy()
+        if target then
+            local cameraCF = Camera.CFrame
+            local lookAt = CFrame.new(cameraCF.Position, target.Position)
+            Camera.CFrame = cameraCF:Lerp(lookAt, AimSmoothness)
+        end
     end
 end)
 
--------------------------------------------------
--- FLY
--------------------------------------------------
+-- Fly
 local function toggleFly(state)
     local hrp = character:FindFirstChild("HumanoidRootPart")
     local hum = character:FindFirstChildOfClass("Humanoid")
@@ -87,16 +80,14 @@ local function toggleFly(state)
     if FlyEnabled then
         hum.PlatformStand = true
 
-        FlyBG = Instance.new("BodyGyro")
+        FlyBG = Instance.new("BodyGyro", hrp)
         FlyBG.MaxTorque = Vector3.new(1e6,1e6,1e6)
         FlyBG.P = 20000
         FlyBG.CFrame = hrp.CFrame
-        FlyBG.Parent = hrp
 
-        FlyBV = Instance.new("BodyVelocity")
+        FlyBV = Instance.new("BodyVelocity", hrp)
         FlyBV.MaxForce = Vector3.new(1e6,1e6,1e6)
         FlyBV.Velocity = Vector3.zero
-        FlyBV.Parent = hrp
 
         FlyLoop = RunService.RenderStepped:Connect(function()
             if not FlyEnabled then return end
@@ -114,12 +105,8 @@ local function toggleFly(state)
                 if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir - Vector3.new(0,1,0) end
             end
 
-            if moveDir.Magnitude > 0 then
-                FlyBV.Velocity = moveDir.Unit * FlySpeed
-                FlyBG.CFrame = CFrame.new(hrp.Position, hrp.Position + camCF.LookVector)
-            else
-                FlyBV.Velocity = Vector3.zero
-            end
+            FlyBV.Velocity = moveDir.Magnitude > 0 and moveDir.Unit * FlySpeed or Vector3.zero
+            FlyBG.CFrame = CFrame.new(hrp.Position, hrp.Position + camCF.LookVector)
         end)
     else
         if FlyLoop then FlyLoop:Disconnect() end
@@ -127,11 +114,9 @@ local function toggleFly(state)
         if FlyBV then FlyBV:Destroy() end
         hum.PlatformStand = false
     end
-end)
+end
 
--------------------------------------------------
 -- GUI
--------------------------------------------------
 local ScreenGui = Instance.new("ScreenGui", Player:WaitForChild("PlayerGui"))
 ScreenGui.Name = "SwiftXYZ"
 
@@ -143,7 +128,6 @@ Main.Active = true
 Main.Draggable = true
 Instance.new("UICorner", Main)
 
--- Title
 local Title = Instance.new("TextLabel", Main)
 Title.Size = UDim2.new(1,0,0,40)
 Title.Text = "Swift.XYZ"
@@ -152,7 +136,6 @@ Title.TextSize = 20
 Title.TextColor3 = Color3.fromRGB(200,200,200)
 Title.BackgroundTransparency = 1
 
--- Button helper
 local function makeButton(text, y, callback)
     local btn = Instance.new("TextButton", Main)
     btn.Size = UDim2.new(1,-20,0,40)
@@ -166,7 +149,6 @@ local function makeButton(text, y, callback)
     btn.MouseButton1Click:Connect(callback)
 end
 
--- Toggle helper
 local function makeToggle(text, y, callback)
     local btn = Instance.new("TextButton", Main)
     btn.Size = UDim2.new(1,-20,0,40)
@@ -206,7 +188,7 @@ makeButton("Close GUI", y, function()
     ScreenGui:Destroy()
 end)
 
--- GUI Toggle (RightShift)
+-- GUI Toggle
 local guiVisible = true
 UserInputService.InputBegan:Connect(function(input, gp)
     if input.KeyCode == Enum.KeyCode.RightShift and not gp then
@@ -214,4 +196,3 @@ UserInputService.InputBegan:Connect(function(input, gp)
         ScreenGui.Enabled = guiVisible
     end
 end)
-
