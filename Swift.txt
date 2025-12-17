@@ -62,15 +62,6 @@ RunService.RenderStepped:Connect(function()
 end)
 
 
-RunService.RenderStepped:Connect(function()
-    if not AimEnabled then return end
-    local target = getAimTarget()
-    if target then
-        local cf = CFrame.new(Camera.CFrame.Position, target.Position)
-        Camera.CFrame = Camera.CFrame:Lerp(cf, AimSmoothness)
-    end
-end)
-
 local function toggleFly(state)
     local hrp = character:FindFirstChild("HumanoidRootPart")
     local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -83,9 +74,15 @@ local function toggleFly(state)
 
         FlyBG = Instance.new("BodyGyro")
         FlyBG.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
-        FlyBG.P = 20_000
+        FlyBG.P = 20000  -- fixed, no underscore
         FlyBG.CFrame = hrp.CFrame
         FlyBG.Parent = hrp
+
+FlyBV = Instance.new("BodyVelocity")
+FlyBV.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+FlyBV.Velocity = Vector3.zero
+FlyBV.Parent = hrp
+
 
         FlyBV = Instance.new("BodyVelocity")
         FlyBV.MaxForce = Vector3.new(1e6, 1e6, 1e6)
@@ -98,28 +95,23 @@ local function toggleFly(state)
             local moveDir = Vector3.zero
             local camCF = Camera.CFrame
 
-            if UserInputService.TouchEnabled then
-                moveDir = humanoid.MoveDirection
-            else
-                if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-                    moveDir += camCF.LookVector
-                end
-                if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-                    moveDir -= camCF.LookVector
-                end
-                if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-                    moveDir -= camCF.RightVector
-                end
-                if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-                    moveDir += camCF.RightVector
-                end
-                if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-                    moveDir += Vector3.new(0,1,0)
-                end
-                if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
-                    moveDir -= Vector3.new(0,1,0)
-                end
-            end
+            if not UserInputService.TouchEnabled then
+    if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+        moveDir = moveDir + camCF.LookVector
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+        moveDir = moveDir - camCF.LookVector
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+        moveDir = moveDir - camCF.RightVector
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+        moveDir = moveDir + camCF.RightVector
+    end
+else
+    -- Mobile: use humanoid move direction
+    moveDir = humanoid.MoveDirection
+end
 
             FlyBV.Velocity = moveDir.Magnitude > 0 and moveDir.Unit * FlySpeed or Vector3.zero
             FlyBG.CFrame = CFrame.new(hrp.Position, hrp.Position + camCF.LookVector)
