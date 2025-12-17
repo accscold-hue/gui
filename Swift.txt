@@ -1,132 +1,277 @@
--- Load Rayfield
-local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/accscold-hue/gui/refs/heads/main/uilib.lua'))()
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
--- Create Window
-local Window = Rayfield:CreateWindow({
-   Name = "Swift.XYZ",
-   Icon = 0,
-   LoadingTitle = "Swift.XYZ",
-   LoadingSubtitle = "Swift.XYZ The only script you will ever need 🙂",
-   ShowText = "Swift.XYZ",
-   Theme = "Amethyst",
-   ToggleUIKeybind = "K",
-   DisableRayfieldPrompts = false,
-   DisableBuildWarnings = false,
-   ConfigurationSaving = {
-      Enabled = true,
-      FolderName = nil,
-      FileName = ""
-   },
-   Discord = {
-      Enabled = true,
-      Invite = "CFmHhXG9GV",
-      RememberJoins = true
-   },
-   KeySystem = true,
-   KeySettings = {
-      Title = "Key",
-      Subtitle = "Key System",
-      Note = "Join The Discord",
-      FileName = "Key",
-      SaveKey = true,
-      GrabKeyFromSite = false,
-      Key = {"SwiftOnTop"}
-   }
-})
-
--- Notification
-Rayfield:Notify({
-   Title = "Swift.XYZ",
-   Content = "Swift has been injected!",
-   Duration = 5,
-   Image = 4483362458,
-})
-
--- ======= Main Menu Tab =======
-local MainTab = Window:CreateTab("Main Menu", 4483362458)
-local MainSection = MainTab:CreateSection("Misc")
-
--- Join Discord Button
-MainTab:CreateButton({
-    Name = "Join Discord",
-    Callback = function()
-        local url = "https://discord.gg/CFmHhXG9GV"
-        setclipboard(url)
-        Rayfield:Notify({
-            Title = " ",
-            Content = "Discord link copied to clipboard!",
-            Duration = 5,
-            Image = 4483362458,
-        })
-    end,
-})
-
--- Destroy UI Button
-MainTab:CreateButton({
-   Name = "Destroy UI",
-   Callback = function()
-       Rayfield:Destroy()
-   end,
-})
-
--- Server Section
-local ServerSection = MainTab:CreateSection("Server")
-
--- Disconnect Button
-MainTab:CreateButton({
-    Name = "Disconnect",
-    Callback = function()
-        game.Players.LocalPlayer:Kick("Thanks for using Swift.XYZ!")
-    end,
-})
-
--- ServerHop Button
-MainTab:CreateButton({
-    Name = "ServerHop",
-    Callback = function()
-        local module = loadstring(game:HttpGet("https://raw.githubusercontent.com/LeoKholYt/roblox/main/lk_serverhop.lua"))()
-        module:Teleport(game.PlaceId)
-    end,
-})
-
--- ======= Player Tab =======
-local PlayerTab = Window:CreateTab("Player", 4483362458)
-local Player = game.Players.LocalPlayer
+local Player = Players.LocalPlayer
 local Character = Player.Character or Player.CharacterAdded:Wait()
-local Humanoid = Character:WaitForChild("Humanoid")
-
--- Update Humanoid on respawn
 Player.CharacterAdded:Connect(function(char)
     Character = char
-    Humanoid = char:WaitForChild("Humanoid")
 end)
 
--- Walk Speed Slider
-local SpeedSlider = PlayerTab:CreateSlider({
-    Name = "Walk Speed",
-    Range = {16, 200},
-    Increment = 1,
-    Suffix = "Speed",
-    CurrentValue = Humanoid.WalkSpeed,
-    Flag = "WalkSpeedSlider",
-    Callback = function(Value)
+local InfiniteJumpEnabled = false
+local FlyEnabled = false
+local FlySpeed = 50
+local BodyGyro
+local BodyVelocity
+
+UserInputService.JumpRequest:Connect(function()
+    if InfiniteJumpEnabled then
+        local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
         if Humanoid then
-            Humanoid.WalkSpeed = Value
+            Humanoid:ChangeState("Jumping")
         end
-    end,
-})
+    end
+end)
 
--- Reset Walk Speed Button
-PlayerTab:CreateButton({
-    Name = "Reset Speed",
-    Callback = function()
-        SpeedSlider:Set(16) -- The new slider integer value
-    end,
-})
+local function startFly()
+    local Humanoid = Character:FindFirstChildOfClass("Humanoid")
+    local Root = Character:FindFirstChild("HumanoidRootPart")
+    if not Humanoid or not Root then return end
 
--- ======= Fun Tab =======
-local FunTab = Window:CreateTab("Fun", 4483362458)
--- Add fun features here if needed
+    BodyGyro = Instance.new("BodyGyro")
+    BodyGyro.P = 9e4
+    BodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+    BodyGyro.CFrame = Root.CFrame
+    BodyGyro.Parent = Root
 
--- Load saved configuration
-Rayfield:LoadConfiguration()
+    BodyVelocity = Instance.new("BodyVelocity")
+    BodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    BodyVelocity.Velocity = Vector3.zero
+    BodyVelocity.Parent = Root
+
+    RunService:BindToRenderStep("Fly", Enum.RenderPriority.Character.Value, function()
+        if not FlyEnabled then return end
+        local cam = workspace.CurrentCamera
+        BodyGyro.CFrame = cam.CFrame
+        local move = Humanoid.MoveDirection
+        local vel = Vector3.zero
+        if move.Magnitude > 0 then
+            vel = cam.CFrame.LookVector * FlySpeed
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            vel += cam.CFrame.UpVector * FlySpeed
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            vel -= cam.CFrame.UpVector * FlySpeed
+        end
+        BodyVelocity.Velocity = vel
+    end)
+end
+
+local function stopFly()
+    RunService:UnbindFromRenderStep("Fly")
+    if BodyGyro then BodyGyro:Destroy() BodyGyro = nil end
+    if BodyVelocity then BodyVelocity:Destroy() BodyVelocity = nil end
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SwiftXYZGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = Player:WaitForChild("PlayerGui")
+
+local Main = Instance.new("Frame")
+Main.Size = UDim2.new(0, 520, 0, 340)
+Main.Position = UDim2.new(0.5, -260, 0.5, -170)
+Main.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = true
+Main.Parent = ScreenGui
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
+
+local fullSize = Main.Size
+local topBarHeight = 40
+local minimized = false
+
+local TopBar = Instance.new("Frame", Main)
+TopBar.Size = UDim2.new(1, 0, 0, topBarHeight)
+TopBar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+TopBar.BorderSizePixel = 0
+Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 10)
+
+local Title = Instance.new("TextLabel", TopBar)
+Title.Size = UDim2.new(1, -60, 1, 0)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.Text = "Swift.XYZ"
+Title.TextColor3 = Color3.fromRGB(200, 200, 200)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+Title.BackgroundTransparency = 1
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+local Minimize = Instance.new("TextButton", TopBar)
+Minimize.Size = UDim2.new(0, 40, 0, 30)
+Minimize.Position = UDim2.new(1, -50, 0, 5)
+Minimize.Text = "_"
+Minimize.Font = Enum.Font.GothamBold
+Minimize.TextSize = 20
+Minimize.TextColor3 = Color3.fromRGB(200, 200, 200)
+Minimize.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Minimize.BorderSizePixel = 0
+Instance.new("UICorner", Minimize).CornerRadius = UDim.new(0, 6)
+
+local Sidebar = Instance.new("Frame", Main)
+Sidebar.Position = UDim2.new(0, 0, 0, topBarHeight)
+Sidebar.Size = UDim2.new(0, 120, 1, -topBarHeight)
+Sidebar.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+Sidebar.BorderSizePixel = 0
+local Layout = Instance.new("UIListLayout", Sidebar)
+Layout.Padding = UDim.new(0, 5)
+Layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+Instance.new("UIPadding", Sidebar).PaddingTop = UDim.new(0, 10)
+
+local Pages = Instance.new("Folder", Main)
+
+local function createPage(name)
+    local Page = Instance.new("Frame")
+    Page.Name = name
+    Page.Size = UDim2.new(1, -130, 1, -50)
+    Page.Position = UDim2.new(0, 130, 0, 50)
+    Page.BackgroundTransparency = 1
+    Page.Visible = false
+    Page.Parent = Pages
+    local Layout = Instance.new("UIListLayout", Page)
+    Layout.Padding = UDim.new(0, 10)
+    return Page
+end
+
+local MainPage = createPage("Main")
+local PlayerPage = createPage("Player")
+local ExploitsPage = createPage("Exploits")
+local SettingsPage = createPage("Settings")
+MainPage.Visible = true
+
+local function createTab(name, page)
+    local Button = Instance.new("TextButton")
+    Button.Size = UDim2.new(1, -10, 0, 35)
+    Button.Text = name
+    Button.Font = Enum.Font.Gotham
+    Button.TextSize = 14
+    Button.TextColor3 = Color3.fromRGB(180, 180, 180)
+    Button.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    Button.BorderSizePixel = 0
+    Button.Parent = Sidebar
+    Instance.new("UICorner", Button).CornerRadius = UDim.new(0, 6)
+    Button.MouseButton1Click:Connect(function()
+        for _, p in pairs(Pages:GetChildren()) do
+            p.Visible = false
+        end
+        page.Visible = true
+    end)
+end
+
+createTab("Main", MainPage)
+createTab("Player", PlayerPage)
+createTab("Exploits", ExploitsPage)
+createTab("Settings", SettingsPage)
+
+local function createButton(parent, text, callback)
+    local Btn = Instance.new("TextButton")
+    Btn.Size = UDim2.new(1, -20, 0, 35)
+    Btn.Text = text
+    Btn.Font = Enum.Font.Gotham
+    Btn.TextSize = 14
+    Btn.TextColor3 = Color3.fromRGB(230, 230, 230)
+    Btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    Btn.BorderSizePixel = 0
+    Btn.Parent = parent
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
+    Btn.MouseButton1Click:Connect(callback)
+end
+
+local function createToggle(parent, text, initialState, callback)
+    local Toggle = Instance.new("TextButton")
+    Toggle.Size = UDim2.new(1, -20, 0, 35)
+    Toggle.Text = text .. ": " .. (initialState and "ON" or "OFF")
+    Toggle.Font = Enum.Font.Gotham
+    Toggle.TextSize = 14
+    Toggle.TextColor3 = Color3.fromRGB(230, 230, 230)
+    Toggle.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    Toggle.BorderSizePixel = 0
+    Toggle.Parent = parent
+    Instance.new("UICorner", Toggle).CornerRadius = UDim.new(0, 6)
+    local state = initialState
+    Toggle.MouseButton1Click:Connect(function()
+        state = not state
+        Toggle.Text = text .. ": " .. (state and "ON" or "OFF")
+        if callback then callback(state) end
+    end)
+end
+
+local NotificationsFolder = Instance.new("Folder", ScreenGui)
+NotificationsFolder.Name = "Notifications"
+
+local function notify(text, duration, color)
+    duration = duration or 3
+    color = color or Color3.fromRGB(50, 50, 50)
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(0, 250, 0, 50)
+    Frame.Position = UDim2.new(1, 260, 0, 10)
+    Frame.BackgroundColor3 = color
+    Frame.BorderSizePixel = 0
+    Frame.Parent = NotificationsFolder
+    Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 8)
+
+    local Label = Instance.new("TextLabel", Frame)
+    Label.Size = UDim2.new(1, -10, 1, -10)
+    Label.Position = UDim2.new(0, 5, 0, 5)
+    Label.Text = text
+    Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Label.BackgroundTransparency = 1
+    Label.Font = Enum.Font.Gotham
+    Label.TextSize = 14
+    Label.TextWrapped = true
+
+    TweenService:Create(Frame, TweenInfo.new(0.3), {Position = UDim2.new(1, -260, 0, 10)}):Play()
+    task.delay(duration, function()
+        TweenService:Create(Frame, TweenInfo.new(0.3), {
+            Position = UDim2.new(1, 260, 0, 10),
+            BackgroundTransparency = 1
+        }):Play()
+        game:GetService("Debris"):AddItem(Frame, 0.3)
+    end)
+end
+
+createToggle(PlayerPage, "Infinite Jump", false, function(state)
+    InfiniteJumpEnabled = state
+    notify(
+        "Infinite Jump: " .. (state and "Enabled" or "Disabled"),
+        3,
+        state and Color3.fromRGB(50,205,50) or Color3.fromRGB(255,0,0)
+    )
+end)
+
+createToggle(PlayerPage, "Fly", false, function(state)
+    FlyEnabled = state
+    if state then
+        startFly()
+    else
+        stopFly()
+    end
+    notify(
+        "Fly: " .. (state and "Enabled" or "Disabled"),
+        3,
+        state and Color3.fromRGB(50,205,50) or Color3.fromRGB(255,0,0)
+    )
+end)
+
+createButton(MainPage, "Disconnect", function()
+    notify("Bye!", 3, Color3.fromRGB(70,130,180))
+    Player:Kick("Thanks for using Swift.XYZ!")
+end)
+
+createButton(SettingsPage, "Close GUI", function()
+    ScreenGui:Destroy()
+end)
+
+local guiVisible = true
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if not gpe and input.KeyCode == Enum.KeyCode.RightShift then
+        guiVisible = not guiVisible
+        ScreenGui.Enabled = guiVisible
+    end
+end)
+
+TweenService:Create(Main, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
+notify("Welcome To Swift.XYZ!", 3, Color3.fromRGB(70,130,180))
